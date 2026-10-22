@@ -1,0 +1,124 @@
+/* Giao diện dùng chung — thuộc P1. Chỉnh ở đây là cả app đổi theo.
+   Không dùng thư viện ngoài, không cần build step. */
+
+:root {
+  --bg: #f6f7f9;
+  --card: #fff;
+  --ink: #1b1f24;
+  --muted: #6b7280;
+  --line: #e5e7eb;
+  --brand: #1f6feb;
+  --ok: #1a7f37;
+  --ok-bg: #dafbe1;
+  --danger: #b3261e;
+  --danger-bg: #ffebe9;
+  --warn: #9a6700;
+  --warn-bg: #fff8c5;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+/* ---- top bar ---- */
+.topbar {
+  display: flex; align-items: center; gap: 20px;
+  padding: 12px 22px; background: #fff; border-bottom: 1px solid var(--line);
+  position: sticky; top: 0; z-index: 5;
+}
+.brand { font-weight: 800; font-size: 18px; text-decoration: none; color: var(--ink); letter-spacing: -.3px; }
+.nav { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin-left: auto; }
+.nav a { color: var(--ink); text-decoration: none; font-weight: 500; }
+.nav a:hover { color: var(--brand); }
+.nav-right { display: flex; align-items: center; gap: 6px; padding-left: 14px; border-left: 1px solid var(--line); }
+.nav-right i { color: var(--danger); font-style: normal; font-weight: 700; }
+.inline { display: inline; margin: 0; }
+.linkish { background: none; border: 0; color: var(--brand); cursor: pointer; font: inherit; padding: 0; text-decoration: underline; }
+
+/* ---- công tắc bản demo ---- */
+.modebar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 9px 22px; background: #fff4d6; border-bottom: 1px solid #f0d98c;
+  position: sticky; top: 55px; z-index: 4;
+}
+.modelabel { font-weight: 600; font-size: 14px; }
+.modeform { display: flex; gap: 6px; margin: 0; }
+.modeform button {
+  padding: 5px 14px; border: 1px solid #c9a227; background: #fff; color: #7a5c00;
+  border-radius: 999px; cursor: pointer; font-weight: 600; font-size: 13px;
+}
+.modeform button.on.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+.modeform button.on.ok { background: var(--ok); border-color: var(--ok); color: #fff; }
+.modehint { color: #7a5c00; font-size: 13px; }
+
+/* ---- layout ---- */
+.wrap { max-width: 1000px; margin: 0 auto; padding: 24px 22px 60px; }
+.hero { text-align: center; padding: 18px 0 26px; }
+.hero h1 { font-size: 34px; margin: 0 0 6px; letter-spacing: -1px; }
+.lead { color: var(--muted); margin: 0; font-size: 16px; }
+.back { color: var(--brand); text-decoration: none; font-weight: 500; }
+
+.box { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 22px; margin-bottom: 18px; }
+.box.narrow { max-width: 440px; margin: 40px auto; }
+.box.warn { background: var(--warn-bg); border-color: #e6c200; }
+.box.error { background: var(--danger-bg); border-color: #ffc1ba; }
+.box.danger-note { background: var(--danger-bg); border-color: #ffc1ba; }
+.box code { background: #0000000d; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+
+/* ---- grid sản phẩm ---- */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column; gap: 6px; }
+.card h2 { font-size: 17px; margin: 0; }
+.desc { color: var(--muted); font-size: 14px; margin: 0; flex: 1; }
+.price { font-size: 17px; font-weight: 700; color: var(--danger); margin: 0; }
+.stock { font-size: 13px; color: var(--muted); }
+
+.btn {
+  display: inline-block; padding: 8px 14px; border-radius: 8px; text-decoration: none;
+  background: var(--brand); color: #fff; font-weight: 600; font-size: 14px; border: 0; cursor: pointer;
+}
+.btn.small { padding: 4px 10px; font-size: 13px; }
+.btn:hover { filter: brightness(1.08); }
+
+/* ---- form ---- */
+.form { display: flex; flex-direction: column; gap: 12px; margin: 0; }
+.form label { font-size: 13px; font-weight: 600; color: #374151; display: flex; flex-direction: column; gap: 5px; }
+.form input, .form textarea { padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; font: inherit; }
+.form input:focus, .form textarea:focus { outline: 2px solid #1f6feb4d; border-color: var(--brand); }
+.form button.primary { padding: 10px; background: var(--brand); color: #fff; border: 0; border-radius: 8px; font: inherit; font-weight: 700; cursor: pointer; }
+.comment-form { margin-top: 16px; }
+.hint { font-size: 13px; color: var(--muted); }
+
+.msg { padding: 10px 12px; border-radius: 8px; font-size: 14px; margin: 0 0 12px; }
+.msg.error { background: var(--danger-bg); color: var(--danger); border: 1px solid #ffc1ba; }
+.msg.ok { background: var(--ok-bg); color: var(--ok); border: 1px solid #a5e3b8; }
+
+/* ---- bảng ---- */
+.tbl { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; margin-bottom: 16px; }
+.tbl th, .tbl td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--line); font-size: 14px; }
+.tbl thead th { background: #f3f4f6; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: #4b5563; }
+.tbl tr:last-child td { border-bottom: 0; }
+.tbl.kv th { width: 170px; background: #f9fafb; color: #4b5563; }
+.tbl.small { font-size: 13px; }
+
+/* ---- bình luận ---- */
+.comments { list-style: none; padding: 0; margin: 0 0 4px; display: flex; flex-direction: column; gap: 10px; }
+.comment { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 11px 14px; }
+.comment p { margin: 5px 0 0; white-space: pre-wrap; word-break: break-word; }
+.comment .muted { font-size: 12px; }
+.comments-section { margin-top: 28px; }
+
+.muted { color: var(--muted); }
+.foot { text-align: center; color: var(--muted); font-size: 12px; padding: 24px; border-top: 1px solid var(--line); }
+
+@media (max-width: 620px) {
+  .topbar { flex-wrap: wrap; gap: 10px; }
+  .nav { margin-left: 0; width: 100%; }
+  .hero h1 { font-size: 27px; }
+}

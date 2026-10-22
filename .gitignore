@@ -1,0 +1,7 @@
+# DB sinh tu dong tu seed — xoa duoc, luon co the tao lai bang: node server.js --reset
+minishop.db
+minishop.db-wal
+minishop.db-shm
+
+# Logs
+*.log
