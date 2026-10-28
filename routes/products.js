@@ -2,7 +2,7 @@
 // Chi tiết sản phẩm + khối bình luận nằm trong comments.js ← P4 (Case 3: XSS).
 
 const db = require('../db');
-const { page, esc, html, money, notImplemented } = require('../helpers');
+const { page, esc, html, money } = require('../helpers');
 const { getMode } = require('../mode');
 
 function home(session) {
@@ -47,7 +47,15 @@ module.exports = function (route) {
         //   Bản sửa  → textContent / escape khi xuất (session/mode 'fixed')
         let commentsHtml;
         if (mode === 'vulnerable') {
-            commentsHtml = notImplemented('Bình luận', session, 'P4', 'routes/comments.js');
+            // Bản lỗi: c.content đổ thẳng vào HTML, KHÔNG qua esc() → thẻ <script> trong bình luận sẽ chạy.
+            commentsHtml = `
+<ul class="comments">
+${comments.map((c) => `
+  <li class="comment">
+    <b>${esc(c.full_name)}</b> <span class="muted">@${esc(c.username)} · ${esc(c.created_at)}</span>
+    <p>${c.content}</p>
+  </li>`).join('\n')}
+</ul>`;
         } else {
             // Bản đã sửa: mọi chuỗi từ người dùng đều qua esc() trước khi ra HTML.
             commentsHtml = `
