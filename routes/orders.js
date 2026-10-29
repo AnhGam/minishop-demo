@@ -2,7 +2,7 @@
 // CHI TIẾT ĐƠN /order?id= thuộc P2 (Case 1: Broken Access Control / IDOR).
 
 const db = require('../db');
-const { page, esc, html, money, notImplemented } = require('../helpers');
+const { page, esc, html, money } = require('../helpers');
 const { getMode } = require('../mode');
 const { requireLogin, deny } = require('../middleware');
 
@@ -44,11 +44,15 @@ function orderDetail(session, query) {
     const mode = getMode(session);
 
     if (mode === 'vulnerable') {
-        // TODO(P2) — BẢN LỖI: chỉ tìm theo id, KHÔNG kiểm tra chủ đơn.
-        //   const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
-        //   ...rồi render order (dù order.user_id !== session.userId vẫn hiện).
-        // Trong lúc chưa viết, tạm trả trang "chưa làm" để app không vỡ:
-        return notImplemented('Đơn hàng', session, 'P2', 'routes/orders.js');
+        // Bản lỗi: chỉ tìm theo id, không kiểm tra order.user_id có trùng session.userId hay không.
+        const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
+        if (!order) {
+            return html(404, page('Đơn hàng', `
+<div class="box warn"><h1>404</h1>
+<p>Đơn hàng không tồn tại.</p>
+<p><a href="/orders">Về danh sách đơn hàng</a></p></div>`, session));
+        }
+        return page('Đơn hàng #' + order.id, renderOrder(order), session);
     }
 
     // Bản đã sửa: id VÀ user_id của người đang đăng nhập. Không đúng chủ → 403.
@@ -64,7 +68,11 @@ function orderDetail(session, query) {
 <p><a href="/orders">Về danh sách đơn hàng</a></p></div>`, session));
     }
 
-    const body = `
+    return page('Đơn hàng #' + order.id, renderOrder(order), session);
+}
+
+function renderOrder(order) {
+    return `
 <a class="back" href="/orders">← Đơn hàng của tôi</a>
 <h1>Đơn hàng #${order.id}</h1>
 <table class="tbl kv">
@@ -75,7 +83,6 @@ function orderDetail(session, query) {
   <tr><th>Ngày tạo</th><td>${esc(order.created_at)}</td></tr>
 </table>
 <p class="muted">Địa chỉ giao trên là dữ liệu nhạy cảm — chỉ chủ đơn mới được xem.</p>`;
-    return page('Đơn hàng #' + order.id, body, session);
 }
 
 module.exports = function (route) {
