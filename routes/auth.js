@@ -43,12 +43,20 @@ function loginHandler({ session, body, remember }) {
     const password = body.password || '';
 
     if (mode === 'vulnerable') {
-        // TODO(P3): viết bản lỗi ở đây — ghép username/password thẳng vào câu SQL.
-        // Gợi ý khung:
-        //   const sql = "SELECT * FROM users WHERE username = '" + username + "' AND password = '" + password + "'";
-        //   const user = db.prepare(sql).get();
-        // Trong lúc chưa viết, tạm trả về thông báo như bản đã sửa để app không vỡ.
-        return loginPage(session, 'Chưa có bản lỗi cho đăng nhập — P3 viết trong routes/auth.js', username);
+      // BẢN LỖI: ghép thẳng input vào câu SQL => input đổi được NGHĨA câu lệnh
+      const sql = "SELECT * FROM users WHERE username = '" + username + "' AND password = '" + password + "'";
+      let user;
+      try {
+        user = db.prepare(sql).get();     // Câu lệnh đã bị input chèn vào
+      } catch (e) {
+        // input làm hỏng cú pháp SQL => hiện lỗi, tránh sập app
+        return loginPage(session, 'Lỗi SQL: ' + e.message, username);
+      }
+      if (!user) return loginPage(session, 'Sai tài khoản hoặc mật khẩu', username);
+      session.userId = user.id;
+      session.user = { id: user.id, username: user.username, full_name: user.full_name, is_admin: !!user.is_admin };
+      remember();                         // ghi lại cookie sau khi đăng nhập
+      return { redirect: '/profile' };
     }
 
     // Bản đã sửa: dữ liệu truyền riêng, không ghép vào cú pháp SQL.
