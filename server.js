@@ -8,7 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 
-const status = require('./helpers').status;
+const { status, page, esc } = require('./helpers');
 
 const PORT = Number(process.env.PORT || 3000);
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -20,6 +20,9 @@ const MIME = {
     '.svg': 'image/svg+xml',
     '.png': 'image/png',
     '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.webp': 'image/webp',
+    '.woff2': 'font/woff2',
     '.ico': 'image/x-icon',
 };
 
@@ -135,12 +138,22 @@ function send(res, out) {
     return status(res, 204, '');
 }
 
-function notFound(res, pathname) {
-    const markup = `<!DOCTYPE html><html lang="vi"><head><meta charset="utf-8"><title>404</title>
-<link rel="stylesheet" href="/style.css"></head><body><main class="wrap">
-<div class="box warn"><h1>404 Không tìm thấy trang</h1><p><code>${pathname}</code> không tồn tại.</p>
-<p><a href="/">Về trang chủ</a></p></div></main></body></html>`;
+function notFound(res, pathname, session) {
+    const markup = page('Không tìm thấy', `
+<div class="notice warn">
+  <h1>404</h1>
+  <p>Trang <code>${esc(pathname)}</code> không có trong cửa hàng.</p>
+  <p><a class="btn" href="/">Về trang mở đầu</a></p>
+</div>`, session);
     return send(res, { code: 404, html: markup });
+}
+
+function safePublicFile(pathname) {
+    if (pathname.includes('\0') || pathname.split('/').includes('..')) return null;
+    const root = path.resolve(PUBLIC_DIR);
+    const file = path.resolve(root, pathname.slice(1));
+    if (file !== root && !file.startsWith(root + path.sep)) return null;
+    return file;
 }
 
 function serveStatic(res, file) {
@@ -163,6 +176,12 @@ const server = http.createServer(async (req, res) => {
 
     try {
         // file tĩnh
+        if (req.method === 'GET' && (pathname.startsWith('/img/') || pathname.startsWith('/fonts/'))) {
+            const file = safePublicFile(pathname);
+            if (!file) return status(res, 403, '<h1>403</h1>');
+            return serveStatic(res, file);
+        }
+
         if (req.method === 'GET' && (pathname === '/style.css' || pathname === '/app.js' || pathname.startsWith('/public/'))) {
             const file = pathname.startsWith('/public/')
                 ? path.join(PUBLIC_DIR, pathname.slice(8))
@@ -185,7 +204,7 @@ const server = http.createServer(async (req, res) => {
         }
 
         const hit = matchRoute(req.method, pathname);
-        if (!hit) return notFound(res, pathname);
+        if (!hit) return notFound(res, pathname, session);
 
         // Truyền thêm forget/remember để route auth dùng mà không cần require server.
         const out = await hit.handler({

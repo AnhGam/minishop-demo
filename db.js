@@ -69,6 +69,12 @@ if (count === 0) {
     seed();
 }
 
+// DB demo cũ chưa có máy trưng bày. Không đụng đơn 101/102 hay id sản phẩm đã seed.
+if (!db.prepare('SELECT id FROM products WHERE name = ?').get('iPhone 18')) {
+    db.prepare('INSERT INTO products (name, description, price, stock) VALUES (?, ?, ?, ?)')
+        .run('iPhone 18', 'Mat kinh trang, khung titan.', 34990000, 12);
+}
+
 function seedAll() {
     const addUser = db.prepare(
         'INSERT INTO users (username, password, full_name, email, phone, address, balance, is_admin) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
@@ -89,6 +95,7 @@ function seedAll() {
     addProduct.run('iPhone 15', 'Dien thoai Apple', 25000000, 50);
     addProduct.run('Samsung Galaxy S24', 'Flagship Android', 22000000, 30);
     addProduct.run('MacBook Air M3', 'Laptop mong nhe', 32000000, 20);
+    addProduct.run('iPhone 18', 'Mat kinh trang, khung titan.', 34990000, 12);
 
     // Don 101 thuoc user1, don 102 thuoc user2 — dung theo kich ban demo P2
     const addOrder = db.prepare(

@@ -13,21 +13,28 @@ module.exports = function (route) {
         const user = db.prepare('SELECT * FROM users WHERE id = ?').get(session.userId);
         if (!user) return { redirect: '/login' };
 
+        const admin = user.is_admin ? '<span class="pill">Quản trị</span>' : '';
         const body = `
-<h1>Trang cá nhân</h1>
-<div class="box ${user.is_admin ? 'danger-note' : ''}">
-  <p>Bạn đang đăng nhập bằng tài khoản <b>${esc(user.full_name)}</b>
-     <code>@${esc(user.username)}</code>${user.is_admin ? ' — <b>QUẢN TRỊ</b>' : ''}.</p>
-</div>
-<table class="tbl kv">
-  <tr><th>ID</th><td>${user.id}</td></tr>
-  <tr><th>Họ tên</th><td>${esc(user.full_name)}</td></tr>
-  <tr><th>Email</th><td>${esc(user.email)}</td></tr>
-  <tr><th>Số điện thoại</th><td>${esc(user.phone)}</td></tr>
-  <tr><th>Địa chỉ</th><td>${esc(user.address)}</td></tr>
-  <tr><th>Số dư</th><td>${money(user.balance)}</td></tr>
-</table>
-<p><a class="btn" href="/orders">Xem đơn hàng của tôi</a></p>`;
-        return page('Trang cá nhân', body, session);
+<header class="collection">
+  <p class="collection-kicker">Tài khoản</p>
+  <h1>Trang cá nhân</h1>
+  <p class="lede">Bạn đang ở tài khoản ${esc(user.full_name)}</p>
+</header>
+<article class="order-sheet profile-card">
+  <div class="card-top">
+    <p class="profile-handle"><code>@${esc(user.username)}</code></p>
+    ${admin}
+  </div>
+  <p class="profile-name">${esc(user.full_name)}</p>
+  <dl class="facts">
+    <div><dt>ID</dt><dd>${user.id}</dd></div>
+    <div><dt>Email</dt><dd>${esc(user.email)}</dd></div>
+    <div><dt>Số điện thoại</dt><dd>${esc(user.phone)}</dd></div>
+    <div><dt>Địa chỉ</dt><dd>${esc(user.address)}</dd></div>
+    <div><dt>Số dư</dt><dd>${money(user.balance)}</dd></div>
+  </dl>
+</article>
+<p class="profile-actions"><a class="btn" href="/orders">Xem đơn hàng của tôi</a></p>`;
+        return page('Trang cá nhân', body, session, '/profile');
     });
 };
