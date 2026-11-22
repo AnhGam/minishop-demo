@@ -1,0 +1,14 @@
+{
+  "name": "minishop-demo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MiniShop - khung demo seminar Bảo mật Web Application (IDOR, SQL Injection, Stored XSS)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/smoke.js"
+  },
+  "engines": {
+    "node": "24.x"
+  }
+}
