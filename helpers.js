@@ -2,7 +2,6 @@
 
 const { getMode } = require('./mode');
 
-// --- escape: bat buoc cho moi du lieu tu nguoi dung dung ra HTML ---
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 function esc(value) {
     if (value === null || value === undefined) return '';
@@ -13,21 +12,26 @@ function money(n) {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(n) || 0);
 }
 
-function page(title, body, session) {
+function page(title, body, session, here) {
     const user = session && session.user;
     const mode = getMode(session);
+    const on = (href) => here === href ? ' aria-current="page"' : '';
     const nav = user
-        ? `<a href="/">Trang chủ</a>
-           <a href="/products">Sản phẩm</a>
-           <a href="/orders">Đơn hàng</a>
-           <a href="/profile">Trang cá nhân</a>
-           <span class="nav-right">${esc(user.full_name)}${user.is_admin ? ' <i>(admin)</i>' : ''}
-             <form class="inline" method="post" action="/logout"><button class="linkish">Thoát</button></form>
-           </span>`
-        : `<a href="/">Trang chủ</a>
-           <a href="/products">Sản phẩm</a>
-           <a href="/login">Đăng nhập</a>`;
+        ? `<a href="/products"${on('/products')}>Bộ sưu tập</a>
+           <a href="/orders"${on('/orders')}>Đơn hàng</a>
+           <a href="/profile"${on('/profile')}>Trang cá nhân</a>
+           <span class="who">${esc(user.full_name)}${user.is_admin ? ' <em>Quản trị</em>' : ''}</span>
+           <form class="inline" method="post" action="/logout"><button class="text-btn">Thoát</button></form>`
+        : `<a href="/products"${on('/products')}>Bộ sưu tập</a>
+           <a href="/login"${on('/login')}>Đăng nhập</a>
+           <a class="btn small" href="/register"${on('/register')}>Tạo tài khoản</a>`;
 
+    const hint = mode === 'vulnerable'
+        ? 'Đang mở bản lỗi.'
+        : 'Đang mở bản đã sửa.';
+
+    const home = here === '/';
+    const shop = here === '/products' || here === '/orders' || here === '/profile';
     return `<!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -36,40 +40,38 @@ function page(title, body, session) {
 <title>${esc(title)} · MiniShop</title>
 <link rel="stylesheet" href="/style.css">
 </head>
-<body>
-<header class="topbar">
-  <a class="brand" href="/">MiniShop</a>
-  <nav class="nav">${nav}</nav>
-</header>
-
-<div class="modebar">
-  <span class="modelabel">Công tắc bản demo (server):</span>
-  <form method="post" action="/mode" class="modeform">
-    <button name="mode" value="vulnerable" class="${mode === 'vulnerable' ? 'on danger' : ''}">Bản lỗi</button>
-    <button name="mode" value="fixed" class="${mode === 'fixed' ? 'on ok' : ''}">Bản đã sửa</button>
-  </form>
-  <span class="modehint">${mode === 'vulnerable'
-      ? 'Đang ở chế độ <b>BẢN LỖI</b> — chức năng nào chưa có code sẽ báo "chưa làm".'
-      : 'Đang ở chế độ <b>BẢN ĐÃ SỬA</b>.'}</span>
+<body class="${home ? 'is-home' : ''}${shop ? ' is-shop' : ''}">
+${home ? '<div class="frame"><div class="canvas">' : ''}
+<div class="top">
+  <header class="mast">
+    <a class="wordmark" href="/">MiniShop</a>
+    <nav class="menu">${nav}</nav>
+  </header>
+  <div class="demo${mode === 'vulnerable' ? ' is-bad' : ' is-ok'}">
+    <span class="demo-kicker"><i class="demo-dot"></i> Buổi demo</span>
+    <form method="post" action="/mode" class="demo-form">
+      <button name="mode" value="vulnerable" class="${mode === 'vulnerable' ? 'is-on' : ''}">Bản lỗi</button>
+      <button name="mode" value="fixed" class="${mode === 'fixed' ? 'is-on' : ''}">Bản đã sửa</button>
+    </form>
+    <span class="demo-hint">${hint}</span>
+  </div>
 </div>
-
-<main class="wrap" data-mode="${mode}">
+<main class="wrap${here === '/' ? ' is-home' : ''}" data-mode="${mode}">
 ${body}
 </main>
-
-<footer class="foot">MiniShop — demo seminar bảo mật web app. Dữ liệu giả lập, không dùng thật.</footer>
+<footer class="foot"><div class="foot-inner"><a class="wordmark" href="/">MiniShop</a><p>Cửa hàng máy chọn lọc.<br>Demo seminar bảo mật web. Dữ liệu giả lập.</p></div></footer>
+${home ? '</div></div>' : ''}
 </body>
 </html>`;
 }
 
-// Trang báo cho P2/P3/P4: hiện khi đang ở "Bản lỗi" mà nhánh đó chưa được viết.
 function notImplemented(title, session, owner, where) {
     return page(title, `
-<div class="box warn">
-  <h2>Chưa có code cho "Bản lỗi"</h2>
+<div class="notice warn">
+  <h1>Chưa có</h1>
   <p>Phần này thuộc <b>${esc(owner)}</b>. Hãy viết nhánh <code>mode === 'vulnerable'</code> trong
-     <code>${esc(where)}</code>, rồi thay hàm này bằng kết quả thật.</p>
-  <p class="muted">Bấm công tắc ở trên về <b>Bản đã sửa</b> để xem nhánh đã chạy được.</p>
+     <code>${esc(where)}</code>.</p>
+  <p class="quiet">Bấm công tắc phía trên về Bản đã sửa để xem nhánh đang chạy.</p>
 </div>`, session);
 }
 
@@ -78,7 +80,6 @@ function status(res, code, html) {
     res.end(html);
 }
 
-// Trả về "HTML + mã lỗi" để server.js ghi đúng status (P2 cần 403).
 function html(code, markup) {
     return { code, html: markup };
 }

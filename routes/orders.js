@@ -6,6 +6,25 @@ const { page, esc, html, money } = require('../helpers');
 const { getMode } = require('../mode');
 const { requireLogin, deny } = require('../middleware');
 
+const STATUS = {
+    NEW: ['Mới', 'pill-new'],
+    PAID: ['Đã thanh toán', 'pill-paid'],
+    SHIPPED: ['Đang giao', 'pill-shipped'],
+    CANCELLED: ['Đã hủy', 'pill-cancelled'],
+};
+
+function when(value) {
+    const text = String(value || '');
+    const [day, time] = text.split(' ');
+    if (!time) return esc(text);
+    return `${esc(day)} · ${esc(time)}`;
+}
+
+function statusPill(status) {
+    const pair = STATUS[status] || [status, ''];
+    return `<span class="pill ${pair[1]}">${esc(pair[0])}</span>`;
+}
+
 function orderList(session) {
     if (!requireLogin(session)) return { redirect: '/login' };
     const orders = db.prepare(`
@@ -14,21 +33,26 @@ function orderList(session) {
         ORDER BY o.id DESC`).all(session.userId);
 
     const body = `
-<h1>Đơn hàng của tôi</h1>
-${orders.length === 0 ? '<p class="muted">Bạn chưa có đơn hàng nào.</p>' : `
-<table class="tbl">
-  <thead><tr><th>Mã đơn</th><th>Tổng tiền</th><th>Trạng thái</th><th>Ngày tạo</th><th></th></tr></thead>
-  <tbody>
+<header class="collection orders-head">
+  <p class="collection-kicker">Tài khoản</p>
+  <h1>Đơn hàng</h1>
+  <p class="lede">${orders.length} đơn của bạn</p>
+</header>
+${orders.length === 0 ? '<p class="quiet orders-empty">Bạn chưa có đơn hàng nào.</p>' : `
+<ul class="orders">
 ${orders.map((o) => `
-  <tr>
-    <td>#${o.id}</td><td>${money(o.total)}</td><td>${esc(o.status)}</td>
-    <td>${esc(o.created_at)}</td>
-    <td><a class="btn small" href="/order?id=${o.id}">Xem</a></td>
-  </tr>`).join('\n')}
-  </tbody>
-</table>`}
-<p class="muted">Thử sửa trực tiếp <code>?id=</code> trên thanh địa chỉ để xem điều gì xảy ra.</p>`;
-    return page('Đơn hàng', body, session);
+  <li><a class="order-card" href="/order?id=${o.id}">
+    <span class="order-card-top">
+      <span class="order-id">#${o.id}</span>
+      ${statusPill(o.status)}
+    </span>
+    <span class="order-total">${money(o.total)}</span>
+    <span class="order-date">${when(o.created_at)}</span>
+    <span class="card-buy">Xem đơn</span>
+  </a></li>`).join('\n')}
+</ul>`}
+<p class="order-note">Thử sửa trực tiếp <code>?id=</code> trên thanh địa chỉ để xem điều gì xảy ra.</p>`;
+    return page('Đơn hàng', body, session, '/orders');
 }
 
 function orderDetail(session, query) {
@@ -36,7 +60,7 @@ function orderDetail(session, query) {
     const id = Number(query.id);
 
     if (Number.isNaN(id)) {
-        return html(400, page('Đơn hàng', '<div class="box warn"><h1>400</h1><p>Mã đơn phải là số.</p></div>', session));
+        return html(400, page('Đơn hàng', '<div class="notice warn"><h1>400</h1><p>Mã đơn phải là số.</p></div>', session, '/orders'));
     }
 
     // ===== P2: VIẾT LOGIC Ở ĐÂY =====
@@ -48,11 +72,11 @@ function orderDetail(session, query) {
         const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
         if (!order) {
             return html(404, page('Đơn hàng', `
-<div class="box warn"><h1>404</h1>
+<div class="notice warn"><h1>404</h1>
 <p>Đơn hàng không tồn tại.</p>
-<p><a href="/orders">Về danh sách đơn hàng</a></p></div>`, session));
+<p><a class="btn" href="/orders">Về đơn hàng của tôi</a></p></div>`, session, '/orders'));
         }
-        return page('Đơn hàng #' + order.id, renderOrder(order), session);
+        return page('Đơn hàng #' + order.id, renderOrder(order), session, '/orders');
     }
 
     // Bản đã sửa: id VÀ user_id của người đang đăng nhập. Không đúng chủ → 403.
@@ -63,26 +87,30 @@ function orderDetail(session, query) {
         const exists = db.prepare('SELECT id FROM orders WHERE id = ?').get(id);
         return html(exists ? 403 : 404,
             page('Đơn hàng', `
-<div class="box error"><h1>${exists ? '403' : '404'}</h1>
-<p>${exists ? 'Bạn không có quyền xem đơn hàng này!' : 'Đơn hàng không tồn tại.'}</p>
-<p><a href="/orders">Về danh sách đơn hàng</a></p></div>`, session));
+<div class="notice${exists ? '' : ' warn'}"><h1>${exists ? '403' : '404'}</h1>
+<p>${exists ? 'Bạn không có quyền xem đơn hàng này.' : 'Đơn hàng không tồn tại.'}</p>
+<p><a class="btn" href="/orders">Về đơn hàng của tôi</a></p></div>`, session, '/orders'));
     }
 
-    return page('Đơn hàng #' + order.id, renderOrder(order), session);
+    return page('Đơn hàng #' + order.id, renderOrder(order), session, '/orders');
 }
 
 function renderOrder(order) {
     return `
 <a class="back" href="/orders">← Đơn hàng của tôi</a>
-<h1>Đơn hàng #${order.id}</h1>
-<table class="tbl kv">
-  <tr><th>Mã đơn</th><td>#${order.id}</td></tr>
-  <tr><th>Trạng thái</th><td>${esc(order.status)}</td></tr>
-  <tr><th>Tổng tiền</th><td>${money(order.total)}</td></tr>
-  <tr><th>Địa chỉ giao</th><td>${esc(order.address)}</td></tr>
-  <tr><th>Ngày tạo</th><td>${esc(order.created_at)}</td></tr>
-</table>
-<p class="muted">Địa chỉ giao trên là dữ liệu nhạy cảm — chỉ chủ đơn mới được xem.</p>`;
+<article class="order-sheet">
+  <div class="card-top">
+    <p class="card-price">${money(order.total)}</p>
+    ${statusPill(order.status)}
+  </div>
+  <h1>Đơn #${order.id}</h1>
+  <dl class="facts">
+    <div><dt>Mã đơn</dt><dd>#${order.id}</dd></div>
+    <div><dt>Địa chỉ giao</dt><dd>${esc(order.address)}</dd></div>
+    <div><dt>Ngày tạo</dt><dd>${when(order.created_at)}</dd></div>
+  </dl>
+</article>
+<p class="order-note">Địa chỉ giao trên là dữ liệu nhạy cảm — chỉ chủ đơn mới được xem.</p>`;
 }
 
 module.exports = function (route) {

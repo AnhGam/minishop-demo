@@ -8,11 +8,21 @@ const { getMode, setMode } = require('../mode');
 // Ở đây CHỈ có phần khung: form, thông báo lỗi, chuyển trang.
 // Logic kiểm tra tài khoản thuộc P3 (Case 2: SQL Injection) — P3 sẽ thay thân hàm loginHandler.
 
+function accountList() {
+    return `
+<ul class="accounts">
+  <li><span>user1</span><span>user1123</span><em>chủ đơn 101</em></li>
+  <li><span>user2</span><span>user2123</span><em>chủ đơn 102</em></li>
+  <li><span>admin</span><span>admin123</span><em>quản trị</em></li>
+</ul>`;
+}
+
 function loginPage(session, message, oldUsername) {
     const body = `
-<div class="box narrow">
+<div class="sheet">
+  <p class="eyebrow">MiniShop</p>
   <h1>Đăng nhập</h1>
-  ${message ? `<p class="msg error">${esc(message)}</p>` : ''}
+  ${message ? `<p class="msg">${esc(message)}</p>` : ''}
   <form method="post" action="/login" class="form">
     <label>Tên đăng nhập
       <input name="username" autocomplete="username" value="${esc(oldUsername || '')}" autofocus>
@@ -20,19 +30,39 @@ function loginPage(session, message, oldUsername) {
     <label>Mật khẩu
       <input name="password" type="password" autocomplete="current-password">
     </label>
-    <button class="primary">Đăng nhập</button>
+    <button>Đăng nhập</button>
   </form>
-  <details class="hint">
-    <summary>Tài khoản demo (xem trước khi diễn)</summary>
-    <table class="tbl small">
-      <tr><th>username</th><th>password</th><th>vai trò</th></tr>
-      <tr><td>user1</td><td>user1123</td><td>chủ đơn 101</td></tr>
-      <tr><td>user2</td><td>user2123</td><td>chủ đơn 102</td></tr>
-      <tr><td>admin</td><td>admin123</td><td>quản trị</td></tr>
-    </table>
+  <p class="sheet-links">Chưa có tài khoản? <a href="/register">Tạo tài khoản</a></p>
+  <details class="demo-accounts">
+    <summary>Tài khoản demo, xem trước khi diễn</summary>
+    ${accountList()}
   </details>
 </div>`;
-    return page('Đăng nhập', body, session);
+    return page('Đăng nhập', body, session, '/login');
+}
+
+function registerPage(session, message, old) {
+    const kept = old || {};
+    const body = `
+<div class="sheet">
+  <p class="eyebrow">MiniShop</p>
+  <h1>Tạo tài khoản</h1>
+  ${message ? `<p class="msg">${esc(message)}</p>${accountList()}` : ''}
+  <form method="post" action="/register" class="form">
+    <label>Họ tên
+      <input name="full_name" autocomplete="name" value="${esc(kept.full_name || '')}" autofocus>
+    </label>
+    <label>Tên đăng nhập
+      <input name="username" autocomplete="username" value="${esc(kept.username || '')}">
+    </label>
+    <label>Mật khẩu
+      <input name="password" type="password" autocomplete="new-password">
+    </label>
+    <button>Tạo tài khoản</button>
+  </form>
+  <p class="sheet-links">Đã có tài khoản? <a href="/login">Đăng nhập</a></p>
+</div>`;
+    return page('Tạo tài khoản', body, session, '/register');
 }
 
 // P3 THAY THÂN HÀM NÀY. Bản "đã sửa" dùng câu SQL tham số (?), bản lỗi ghép chuỗi.
@@ -73,6 +103,14 @@ function loginHandler({ session, body, remember }) {
 
 module.exports = function (route) {
     route('GET', '/login', ({ session }) => loginPage(session, null, ''));
+
+    route('GET', '/register', ({ session }) => registerPage(session, null, null));
+
+    route('POST', '/register', ({ session, body }) => registerPage(
+        session,
+        'Buổi demo dùng tài khoản đã chuẩn bị sẵn. Hãy đăng nhập bằng một tài khoản bên dưới.',
+        body,
+    ));
 
     route('POST', '/login', (ctx) => {
         const out = loginHandler(ctx);
