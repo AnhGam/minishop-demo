@@ -2,6 +2,11 @@
 //   chạy:            node server.js
 //   chạy + reset DB: node server.js --reset
 //   đổi port:        PORT=4000 node server.js
+//
+// Biến môi trường cho production (local không cần đặt gì, chạy y như cũ):
+//   NODE_ENV=production   → cookie có cờ Secure, gửi X-Robots-Tag: noindex, /robots.txt chặn toàn bộ
+//   SESSION_SECRET=...    → khóa ký cookie cố định (không có thì sinh ngẫu nhiên mỗi lần khởi động)
+//   BASIC_AUTH_USER/PASS  → khóa toàn site bằng Basic Auth (trừ /healthz)
 
 const http = require('node:http');
 const fs = require('node:fs');
@@ -12,7 +17,12 @@ const { status, page, esc } = require('./helpers');
 
 const PORT = Number(process.env.PORT || 3000);
 const PUBLIC_DIR = path.join(__dirname, 'public');
-const SECRET = crypto.randomBytes(32); // ký cookie session — sinh mới mỗi lần khởi động
+const IS_PROD = process.env.NODE_ENV === 'production';
+// ký cookie session — production đọc từ biến môi trường, local sinh mới mỗi lần khởi động
+const SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32);
+const BASIC_USER = process.env.BASIC_AUTH_USER || '';
+const BASIC_PASS = process.env.BASIC_AUTH_PASS || '';
+const BASIC_AUTH_ON = Boolean(BASIC_USER && BASIC_PASS);
 
 const MIME = {
     '.css': 'text/css; charset=utf-8',
@@ -49,7 +59,8 @@ function sign(sid) {
 
 // Một cookie duy nhất: "<sid>.<chu ky>". Client không tự bịa được chu ký vì không biết SECRET.
 function sessionCookie(data) {
-    const flags = 'Path=/; HttpOnly; SameSite=Strict'; // SameSite chống CSRF cho các POST của app
+    // SameSite chống CSRF cho các POST của app; Secure chỉ bật trên production (HTTPS)
+    const flags = 'Path=/; HttpOnly; SameSite=Strict' + (IS_PROD ? '; Secure' : '');
     return `${SID_COOKIE}=${data.sid}.${sign(data.sid)}; ${flags}`;
 }
 
@@ -81,7 +92,27 @@ function remember(res, data) {
 }
 
 function forget(res) {
-    res.setHeader('Set-Cookie', `${SID_COOKIE}=; Path=/; Max-Age=0`);
+    res.setHeader('Set-Cookie', `${SID_COOKIE}=; Path=/; Max-Age=0` + (IS_PROD ? '; Secure' : ''));
+}
+
+// ---------------------------------------------------------------- basic auth
+// Khóa toàn site khi deploy (app cố ý có lỗ hổng, không để người lạ vào).
+// So sánh hash SHA-256 bằng timingSafeEqual: độ dài luôn bằng nhau, không lộ thông tin qua thời gian.
+function sameSecret(a, b) {
+    const ha = crypto.createHash('sha256').update(a).digest();
+    const hb = crypto.createHash('sha256').update(b).digest();
+    return crypto.timingSafeEqual(ha, hb);
+}
+
+function basicAuthOk(req) {
+    const [scheme, encoded] = (req.headers.authorization || '').split(' ');
+    if (scheme !== 'Basic' || !encoded) return false;
+    const decoded = Buffer.from(encoded, 'base64').toString('utf8');
+    const i = decoded.indexOf(':');
+    if (i < 0) return false;
+    const userOk = sameSecret(decoded.slice(0, i), BASIC_USER);
+    const passOk = sameSecret(decoded.slice(i + 1), BASIC_PASS);
+    return userOk && passOk;
 }
 
 // ---------------------------------------------------------------- body
@@ -173,6 +204,28 @@ const server = http.createServer(async (req, res) => {
     catch { return status(res, 400, '<h1>400 Bad Request</h1>'); }
 
     const pathname = (url.pathname !== '/' && url.pathname.endsWith('/') ? url.pathname.slice(0, -1) : url.pathname);
+
+    // Render gọi route này để biết app còn sống — không cần Basic Auth
+    if (pathname === '/healthz') {
+        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+        return res.end('OK');
+    }
+
+    if (IS_PROD) {
+        res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+        if (pathname === '/robots.txt') {
+            res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+            return res.end('User-agent: *\nDisallow: /\n');
+        }
+    }
+
+    if (BASIC_AUTH_ON && !basicAuthOk(req)) {
+        res.writeHead(401, {
+            'WWW-Authenticate': 'Basic realm="MiniShop", charset="UTF-8"',
+            'Content-Type': 'text/plain; charset=utf-8',
+        });
+        return res.end('401 - Cần đăng nhập để xem MiniShop');
+    }
 
     try {
         // file tĩnh

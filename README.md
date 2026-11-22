@@ -68,6 +68,37 @@ node test/smoke.js
 
 Chạy server trên cổng 3100, kiểm tra toàn bộ luồng, tắt server. Dùng để biết mình có làm hỏng khung của P1 hay không.
 
+## Deployment (Render)
+
+Bản deploy chỉ để giảng viên mở link xem/chấm. Buổi seminar vẫn chạy local bằng `node server.js`.
+Mọi thay đổi cho production **chỉ bật khi có biến môi trường**, nên chạy local vẫn như cũ.
+
+**Cấu hình Web Service** (gói Free, 1 instance vì session lưu trong RAM):
+
+| Mục | Giá trị |
+|-----|---------|
+| Branch | `master` (Auto-Deploy bật) |
+| Runtime | Node (phiên bản ghim `24.x` trong `package.json`, cần cho `node:sqlite`) |
+| Build command | để trống, vì không có dependency |
+| Start command | `node server.js` |
+| Health check path | `/healthz` |
+
+**Biến môi trường:**
+
+| Biến | Tác dụng |
+|------|----------|
+| `NODE_ENV=production` | cookie có cờ `Secure`, gửi `X-Robots-Tag: noindex, nofollow`, `/robots.txt` chặn toàn bộ |
+| `SESSION_SECRET` | khóa ký cookie session; tạo bằng `openssl rand -base64 32` |
+| `BASIC_AUTH_USER`, `BASIC_AUTH_PASS` | khóa toàn site bằng Basic Auth (trừ `/healthz`) |
+
+`PORT` do Render tự cấp, `server.js` đọc sẵn.
+
+**Lưu ý:**
+- Gói Free không có ổ đĩa lưu lâu dài: mỗi lần restart/deploy, DB tự seed lại sạch và mọi session mất.
+- Service ngủ sau khoảng 15 phút không ai truy cập; lần mở đầu sau đó chờ khoảng 30–60 giây.
+- Thông tin Basic Auth gửi riêng cho giảng viên, **không** ghi vào README.
+- Chấm xong thì Suspend hoặc Delete service, không để app có lỗ hổng cố ý chạy lâu dài trên Internet.
+
 ## Dữ liệu mẫu đã seed
 
 - 3 user: `user1`, `user2`, `admin`
@@ -100,5 +131,6 @@ minishop/
 │   ├── style.css      # giao diện
 │   └── app.js         # renderComments (thuần textContent)
 ├── test/smoke.js      # kiểm tra tự động
+├── package.json       # ghim Node 24.x, script start/test (không có dependency)
 └── minishop.db        # SQLite — sinh tự động, xoá được bất cứ lúc nào
 ```
