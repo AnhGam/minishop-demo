@@ -6,7 +6,7 @@
 // Biến môi trường cho production (local không cần đặt gì, chạy y như cũ):
 //   NODE_ENV=production   → cookie có cờ Secure, gửi X-Robots-Tag: noindex, /robots.txt chặn toàn bộ
 //   SESSION_SECRET=...    → khóa ký cookie cố định (không có thì sinh ngẫu nhiên mỗi lần khởi động)
-//   BASIC_AUTH_USER/PASS  → khóa toàn site bằng Basic Auth (trừ /healthz)
+//   ACCESS_KEY=...        → chỉ ai mở link có ?key=<ACCESS_KEY> mới vào được (trừ /healthz, /robots.txt)
 
 const http = require('node:http');
 const fs = require('node:fs');
@@ -20,9 +20,11 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 const IS_PROD = process.env.NODE_ENV === 'production';
 // ký cookie session — production đọc từ biến môi trường, local sinh mới mỗi lần khởi động
 const SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32);
-const BASIC_USER = process.env.BASIC_AUTH_USER || '';
-const BASIC_PASS = process.env.BASIC_AUTH_PASS || '';
-const BASIC_AUTH_ON = Boolean(BASIC_USER && BASIC_PASS);
+const ACCESS_KEY = process.env.ACCESS_KEY || '';
+const ACCESS_COOKIE = 'minishop_access';
+// Giá trị cookie suy ra từ ACCESS_KEY: ổn định qua các lần restart, đổi key là mọi cookie cũ hết hiệu lực,
+// và nhìn cookie không suy ngược ra được key.
+const ACCESS_TOKEN = ACCESS_KEY ? crypto.createHash('sha256').update('minishop-access:' + ACCESS_KEY).digest('base64url') : '';
 
 const MIME = {
     '.css': 'text/css; charset=utf-8',
@@ -95,24 +97,25 @@ function forget(res) {
     res.setHeader('Set-Cookie', `${SID_COOKIE}=; Path=/; Max-Age=0` + (IS_PROD ? '; Secure' : ''));
 }
 
-// ---------------------------------------------------------------- basic auth
+// ---------------------------------------------------------------- access key
 // Khóa toàn site khi deploy (app cố ý có lỗ hổng, không để người lạ vào).
+// Mở link có ?key=<ACCESS_KEY> một lần → server đặt cookie, các lần sau không cần key nữa.
 // So sánh hash SHA-256 bằng timingSafeEqual: độ dài luôn bằng nhau, không lộ thông tin qua thời gian.
 function sameSecret(a, b) {
-    const ha = crypto.createHash('sha256').update(a).digest();
-    const hb = crypto.createHash('sha256').update(b).digest();
+    const ha = crypto.createHash('sha256').update(String(a)).digest();
+    const hb = crypto.createHash('sha256').update(String(b)).digest();
     return crypto.timingSafeEqual(ha, hb);
 }
 
-function basicAuthOk(req) {
-    const [scheme, encoded] = (req.headers.authorization || '').split(' ');
-    if (scheme !== 'Basic' || !encoded) return false;
-    const decoded = Buffer.from(encoded, 'base64').toString('utf8');
-    const i = decoded.indexOf(':');
-    if (i < 0) return false;
-    const userOk = sameSecret(decoded.slice(0, i), BASIC_USER);
-    const passOk = sameSecret(decoded.slice(i + 1), BASIC_PASS);
-    return userOk && passOk;
+function hasAccessCookie(req) {
+    const token = parseCookies(req.headers.cookie)[ACCESS_COOKIE];
+    return Boolean(token) && sameSecret(token, ACCESS_TOKEN);
+}
+
+function accessCookie() {
+    // Lax (không phải Strict) để bấm lại link từ email/LMS vẫn gửi kèm cookie
+    return `${ACCESS_COOKIE}=${ACCESS_TOKEN}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 24 * 3600}`
+        + (IS_PROD ? '; Secure' : '');
 }
 
 // ---------------------------------------------------------------- body
@@ -205,7 +208,7 @@ const server = http.createServer(async (req, res) => {
 
     const pathname = (url.pathname !== '/' && url.pathname.endsWith('/') ? url.pathname.slice(0, -1) : url.pathname);
 
-    // Render gọi route này để biết app còn sống — không cần Basic Auth
+    // Render gọi route này để biết app còn sống — không cần key
     if (pathname === '/healthz') {
         res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
         return res.end('OK');
@@ -219,12 +222,19 @@ const server = http.createServer(async (req, res) => {
         }
     }
 
-    if (BASIC_AUTH_ON && !basicAuthOk(req)) {
-        res.writeHead(401, {
-            'WWW-Authenticate': 'Basic realm="MiniShop", charset="UTF-8"',
-            'Content-Type': 'text/plain; charset=utf-8',
-        });
-        return res.end('401 - Cần đăng nhập để xem MiniShop');
+    if (ACCESS_KEY) {
+        const key = url.searchParams.get('key');
+        if (key !== null && sameSecret(key, ACCESS_KEY)) {
+            // Key đúng: đặt cookie rồi chuyển về đúng trang đó nhưng bỏ ?key khỏi thanh địa chỉ
+            url.searchParams.delete('key');
+            const rest = url.searchParams.toString();
+            res.writeHead(303, { 'Set-Cookie': accessCookie(), Location: url.pathname + (rest ? '?' + rest : '') });
+            return res.end();
+        }
+        if (!hasAccessCookie(req)) {
+            res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+            return res.end('403 - Link không hợp lệ. Hãy mở đúng đường dẫn được gửi cho bạn.');
+        }
     }
 
     try {
