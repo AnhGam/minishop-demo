@@ -89,14 +89,14 @@ Mọi thay đổi cho production **chỉ bật khi có biến môi trường**, 
 |------|----------|
 | `NODE_ENV=production` | cookie có cờ `Secure`, gửi `X-Robots-Tag: noindex, nofollow`, `/robots.txt` chặn toàn bộ |
 | `SESSION_SECRET` | khóa ký cookie session; tạo bằng `openssl rand -base64 32` |
-| `BASIC_AUTH_USER`, `BASIC_AUTH_PASS` | khóa toàn site bằng Basic Auth (trừ `/healthz`) |
+| `ACCESS_KEY` | khóa toàn site: chỉ ai mở link `https://<app>.onrender.com/?key=<ACCESS_KEY>` mới vào được, sau đó server nhớ bằng cookie 30 ngày (trừ `/healthz`, `/robots.txt`); tạo bằng `openssl rand -hex 16` (chỉ gồm 0-9a-f, an toàn khi đặt trong URL) |
 
 `PORT` do Render tự cấp, `server.js` đọc sẵn.
 
 **Lưu ý:**
 - Gói Free không có ổ đĩa lưu lâu dài: mỗi lần restart/deploy, DB tự seed lại sạch và mọi session mất.
 - Service ngủ sau khoảng 15 phút không ai truy cập; lần mở đầu sau đó chờ khoảng 30–60 giây.
-- Thông tin Basic Auth gửi riêng cho giảng viên, **không** ghi vào README.
+- Link có kèm `?key=` gửi riêng cho giảng viên, **không** ghi vào README. Đổi `ACCESS_KEY` là mọi link và cookie cũ hết hiệu lực.
 - Chấm xong thì Suspend hoặc Delete service, không để app có lỗ hổng cố ý chạy lâu dài trên Internet.
 
 ## Dữ liệu mẫu đã seed
